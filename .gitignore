@@ -1,0 +1,39 @@
+# Tools Specific files
+.idea
+.install
+*.orig
+.grunt
+.sass-cache
+.vagrant
+
+# Packaged Dependencies
+/node_modules
+/bower_components
+/packages
+/vendor
+
+# Laravel files
+.env
+/public/assets
+/public/storage
+/public/sum.md5
+/resources/assets/html
+
+
+# Custom files
+/resources/lang/need_translate.txt
+
+# Old design
+/public/old
+/resources/old
+
+# New design
+/resources/html_template/node_modules
+/resources/html_template/bower_components
+/resources/html_template/js
+/resources/html_template/css
+
+/db
+/.phpstorm.meta.php
+/_ide_helper.php
+/storage/proxies/
