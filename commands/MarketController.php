@@ -57,22 +57,12 @@ class MarketController extends Controller
         //$data = Bitmex::getPairInfo($dateGMT);
         $price = Bitmex::getPairInfoWebSocket();
 
-        $arrData[] = ["XBT", $price, $dateNow];
-        \Yii::$app->db->createCommand()->batchInsert('market_histry', ['name', 'price', 'time'], $arrData)->execute();
-
         $data = MarketHistory::find()
             ->where(['between', 'time', $dateGMT, $dateNow])
             ->asArray()
             ->all();
 
-
-
-        
         $priceChange = round($data[0]['price'] - $price, 2);
-
-        //$msg = "Цена без изменений \n";
-        //$msg .= "Цена сейчас: <b>" .  $data[4]['price'] . "</b>\n";
-        //$msg .= "Цена 5 минут назад: <b>" .  $data[0]['price'] . "</b>";
 
         if ($priceChange >= 30){
             $msg = "Цена XBT выросла на <b>" . $priceChange ."</b>\n";
@@ -80,11 +70,11 @@ class MarketController extends Controller
             $msg .= "Цена 5 минут назад: " .  $data[0]['price'];
         }elseif($priceChange <= -30){
             $msg = "Цена XBT упала на <b>" . $priceChange * -1 . "</b>\n";
-            $msg .= "Цена сечас: " .  $data[4]['price'] . "\n";
+            $msg .= "Цена сейчас: " .  $data[4]['price'] . "\n";
             $msg .= "Цена 5 минут назад: " .  $data[0]['price'];
         }
 
-        print_r($priceChange);
+        //print_r($priceChange);
 
         if (isset($msg)){
             $keyboardData[0]['text'] = "Текущий курс";
@@ -94,13 +84,7 @@ class MarketController extends Controller
                 $keyboardData
             );
         }
-
-
         (new Market())->sendMesage($users, $msg, $inline_keyboard);
-        
-        //print_r($data[0]['price'] . '<br>');
-        //print_r( $data[4]['price'] . '<br>');
-        //print_r($users[0]->chat_id);
     }
 
     public function actionFiveMinutes()
