@@ -13,10 +13,12 @@ namespace Longman\TelegramBot\Commands\SystemCommands;
 use app\libraries\Bittrex;
 use app\libraries\Bitmex;
 use app\libraries\Market;
+use app\models\MarketHistory;
 use app\models\Modes;
 use app\models\User;
 use Longman\TelegramBot\Commands\SystemCommand;
 use Longman\TelegramBot\Entities\InlineKeyboard;
+use Longman\TelegramBot\Entities\Keyboard;
 use Longman\TelegramBot\Request;
 
 /**
@@ -193,10 +195,16 @@ class CallbackqueryCommand extends SystemCommand
                 return Request::editMessageText($data);
                 break;
             case 'trade':
-                $dateNowB = (new \DateTime())->modify('-3 hour -1 minutes')->format('Y-m-d\TH:i:s');
-                $dateNow = (new \DateTime())->modify('-1 minutes')->format('Y-m-d H:i:s');
-                $dataB = Bitmex::getPairInfo($dateNowB);
-                $data['text'] = "Время: <b>" . $dateNow . "</b> \nКурс XBT: <b>" . $dataB[0]['price'] . "</b>" ;
+                $dateNowB = (new \DateTime())->modify('-1 minutes')->format('Y-m-d H:i:s');
+                $dateNow = (new \DateTime())->format('Y-m-d H:i:s');
+
+
+                $datas = MarketHistory::find()
+                    ->where(['between', 'time', $dateNowB, $dateNow])
+                    ->asArray()
+                    ->all();
+
+                $data['text'] = "Время: <b>" . $dateNow . "</b> \nКурс XBT: <b>" . end($datas)['price'] . "</b>" ;
 
                 $keyboardData[0]['text'] = "Обновить курс";
                 $keyboardData[0]['callback_data'] = 'trade';
@@ -204,6 +212,7 @@ class CallbackqueryCommand extends SystemCommand
                     $keyboardData
                 );
                 $data['reply_markup'] = $inline_keyboard;
+                //$data['reply_markup'] = (new Keyboard(['M', 'F']))->setResizeKeyboard(true)->setOneTimeKeyboard(true)->setSelective(true);
 
                 return Request::editMessageText($data);
                 break;

@@ -59,7 +59,7 @@ class Modes extends \yii\db\ActiveRecord
         return self::findOne(['user_id' => $id]);
     }
 
-    public static function findMode($id, $pair){
+    public static function findMode($id, $pair = false){
         return self::findOne(['user_id' => $id]);
     }
 }

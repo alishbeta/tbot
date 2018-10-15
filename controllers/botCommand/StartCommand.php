@@ -1,10 +1,11 @@
 <?php
 
-namespace Longman\TelegramBot\Commands\UserCommands;
+namespace Longman\TelegramBot\Commands\SystemCommands;
 
 use app\models\Modes;
 use Longman\TelegramBot\Commands\SystemCommand;
 use Longman\TelegramBot\Commands\UserCommand;
+use Longman\TelegramBot\Entities\Keyboard;
 use Longman\TelegramBot\Request;
 
 /**
@@ -50,12 +51,22 @@ class StartCommand extends SystemCommand
 
         if ($user->status == \app\models\User::STATUS_BOT_LOGIN){
             $data['text'] = 'Вы уже авторизированы.';
+        }else{
+            if (empty($mode))
+                (new Modes())->setMode(['name' => 'login', 'user_id' => $user->id]);
+
+            $data['text'] = 'Введите пароль...';
         }
 
-        if (empty($mode))
-            (new Modes())->setMode(['name' => 'login', 'user_id' => $user->id]);
+        \Yii::error($user->status, 'app');
 
-        $data['text'] = 'Введите пароль...';
+
+
+//        $keyboard = new Keyboard(
+//            $keyboardData[0]['text'] = "Обновить курс"
+//        );
+        //$data['reply_markup'] = $inline_keyboard;
+        //$data['reply_markup'] = $keyboard;
 
         return Request::sendMessage($data);
 

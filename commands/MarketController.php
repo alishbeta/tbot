@@ -14,10 +14,10 @@ use app\libraries\Market;
 use app\models\MarketHistory;
 use app\models\User;
 use Longman\TelegramBot\Entities\InlineKeyboard;
+use yii\console\Controller;
 use React\EventLoop\Factory;
 use React\Socket\Connector;
-use yii\console\Controller;
-use Ratchet\Client;
+use yii\db\Exception;
 
 
 class MarketController extends Controller
@@ -26,51 +26,100 @@ class MarketController extends Controller
     {
         MarketHistory::deleteAll();
     }
-    public function actionMarketSave()
+    public function actionBitmexDemon()
     {
-//        $date = (new \DateTime())->add(new \DateInterval("PT2H"));
-//
-//        $data = Bittrex::getMarketSummaries();
-//        foreach ($data['result'] as $res) {
-//            if (strpos($res['MarketName'], 'ETH-') === false)
-//                    $arrData[] = [$res['MarketName'], Market::exp_to_dec($res['Last']), $date->format('Y-m-d H:i:s')];
-//        }
-//        \Yii::$app->db->createCommand()->batchInsert('market_histry', ['name', 'price', 'time'], $arrData)->execute();
+        $loop = Factory::create();
+        $reactConnector = new Connector($loop, [
+            'dns' => '8.8.8.8',
+            'timeout' => 10
+        ]);
+        $connector = new \Ratchet\Client\Connector($loop, $reactConnector);
 
-        $dateNow = (new \DateTime())->format('Y-m-d H:i:s');
-        $price = Bitmex::getPairInfoWebSocket();
+        $connector('wss://www.bitmex.com/realtime?subscribe=instrument:XBTUSD')
+            ->then(function(\Ratchet\Client\WebSocket $conn) {
+                $conn->on('message', function(\Ratchet\RFC6455\Messaging\MessageInterface $msg) use ($conn) {
+                    $data = json_decode($msg, 1);
 
-        $arrData[] = ["XBT", $price, $dateNow];
-        \Yii::$app->db->createCommand()->batchInsert('market_histry', ['name', 'price', 'time'], $arrData)->execute();
+                    if ($data['data'][0]['lastPrice']){
+                        $dateNow = (new \DateTime())->format('Y-m-d H:i:s');
+
+                        echo $dateNow . "\n";
+
+                    if (\Yii::$app->cache->get('lastSave') === false) {
+                        \Yii::$app->cache->set('lastSave', $dateNow);
+                    }
+
+                        $lastSave = \Yii::$app->cache->get('lastSave');
+                        $lastSaveDate = strtotime($lastSave);
+                        $diff = strtotime($dateNow) - $lastSaveDate;
+
+                        echo $diff . "\n";
+
+                        if ($diff > 20) {
+                            \Yii::$app->cache->set('lastSave', $dateNow);
+                            $price = $data['data'][0]['lastPrice'];
+
+                            $arrData[] = ["XBT", $price, $dateNow];
+                            try {
+                                \Yii::$app->db->createCommand()->batchInsert('market_histry', ['name', 'price', 'time'], $arrData)->execute();
+                            } catch (Exception $e) {
+                                $conn->close();
+                            }
+                        }
+
+                }
+                });
+
+                $conn->on('close', function($code = null, $reason = null) {
+                    echo "Connection closed ({$code} - {$reason})\n";
+                });
+            }, function(\Exception $e) use ($loop) {
+                echo "Could not connect: {$e->getMessage()}\n";
+                $loop->stop();
+            });
+        $loop->run();
     }
 
     public function actionWbTest(){
-        print_r(Bitmex::getPairInfoWebSocket());
+        $dateNowB = (new \DateTime())->modify('-1 minutes')->format('Y-m-d H:i:s');
+        $dateNow = (new \DateTime())->format('Y-m-d H:i:s');
+
+        $datas = MarketHistory::find()
+            ->where(['between', 'time', $dateNowB, $dateNow])
+            ->asArray()
+            ->all();
+        $data['text'] = "Время: <b>" . $dateNow . "</b> \nКурс XBT: <b>" . end($datas)['price'] . "</b>" ;
+
+        print_r($data['text']);
     }
 
     public function actionFiveMinutesBitmex()
     {
+        date_default_timezone_set('Europe/Kiev');
         $dateNow = (new \DateTime())->format('Y-m-d H:i:s');
         $dateGMT = (new \DateTime())->modify('-5 minutes')->format('Y-m-d H:i:s');
 
         $users = User::find()->all();
         //$data = Bitmex::getPairInfo($dateGMT);
-        $price = Bitmex::getPairInfoWebSocket();
+        //$price = Bitmex::getPairInfoWebSocket();
 
         $data = MarketHistory::find()
             ->where(['between', 'time', $dateGMT, $dateNow])
             ->asArray()
             ->all();
 
-        $priceChange = round($data[0]['price'] - $price, 2);
 
-        if ($priceChange >= 30){
+        $priceChange = round(end($data)['price'] - $data[0]['price'], 2);
+
+        //print_r($priceChange);
+
+        if ($priceChange >= 15){
             $msg = "Цена XBT выросла на <b>" . $priceChange ."</b>\n";
-            $msg .= "Цена сеqчас: " .  $data[4]['timestamp']. "\n";
+            $msg .= "Цена сейчас: " .  end($data)['price']. "\n";
             $msg .= "Цена 5 минут назад: " .  $data[0]['price'];
-        }elseif($priceChange <= -30){
+        }elseif($priceChange <= -15){
             $msg = "Цена XBT упала на <b>" . $priceChange * -1 . "</b>\n";
-            $msg .= "Цена сейчас: " .  $data[4]['price'] . "\n";
+            $msg .= "Цена сейчас: " .  end($data)['price'] . "\n";
             $msg .= "Цена 5 минут назад: " .  $data[0]['price'];
         }
 
